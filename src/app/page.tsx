@@ -1,6 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+import {
+  getCartSnapshot,
+  getCartCount,
+  getEmptyCartSnapshot,
+  getCartTotal,
+  subscribeToCart,
+  writeCart,
+} from "@/lib/cart";
 import {
   calculateFreight,
   FREIGHT_BASE_PRICES_KZ,
@@ -96,8 +104,46 @@ export default function Home() {
   const [province, setProvince] = useState<AngolaProvince>("Huambo");
   const [weightKg, setWeightKg] = useState("1");
   const [itemType, setItemType] = useState<FreightItemType>("NORMAL");
-  const [cartCount, setCartCount] = useState(0);
+  const cart = useSyncExternalStore(
+    subscribeToCart,
+    getCartSnapshot,
+    getEmptyCartSnapshot,
+  );
   const [cartOpen, setCartOpen] = useState(false);
+
+  const cartCount = getCartCount(cart);
+  const cartTotal = getCartTotal(cart);
+
+  function addToCart(product: (typeof products)[number]) {
+    const existingItem = cart.find((item) => item.id === product.name);
+    const updatedCart = existingItem
+      ? cart.map((item) =>
+          item.id === product.name
+            ? { ...item, quantity: item.quantity + 1 }
+            : item,
+        )
+      : [
+          ...cart,
+          {
+            id: product.name,
+            name: product.name,
+            seller: product.seller,
+            price: product.price,
+            image: product.image,
+            quantity: 1,
+          },
+        ];
+
+    writeCart(updatedCart);
+  }
+
+  function updateCartQuantity(itemId: string, quantity: number) {
+    const updatedCart = cart
+      .map((item) => (item.id === itemId ? { ...item, quantity } : item))
+      .filter((item) => item.quantity > 0);
+
+    writeCart(updatedCart);
+  }
 
   const filteredProducts = products.filter((product) => {
     const matchesCategory =
@@ -158,7 +204,7 @@ export default function Home() {
           <div className="relative ml-auto flex shrink-0 items-center gap-4">
             <a
               className="hidden text-sm font-semibold text-[#343731] transition-colors hover:text-[#d94332] sm:inline"
-              href="#destaques"
+              href="/auth/signin"
             >
               Entrar
             </a>
@@ -172,15 +218,78 @@ export default function Home() {
               Sacola <span className="text-[#d94332]">{cartCount}</span>
             </button>
             {cartOpen && (
-              <div className="absolute right-0 top-12 z-30 w-64 rounded-md border border-[#dedfd9] bg-white p-4 shadow-xl">
-                <p className="font-semibold">A tua sacola</p>
-                <p className="mt-1 text-sm text-[#74766f]" aria-live="polite">
-                  {cartCount === 0
-                    ? "Ainda não adicionaste produtos."
-                    : `${cartCount} ${cartCount === 1 ? "artigo" : "artigos"} na sacola.`}
-                </p>
+              <div className="absolute right-0 top-12 z-30 w-[min(24rem,calc(100vw-2rem))] rounded-md border border-[#dedfd9] bg-white p-4 shadow-xl sm:p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="font-semibold">A tua sacola</h2>
+                  <span className="text-xs text-[#777970]">
+                    {cartCount} {cartCount === 1 ? "artigo" : "artigos"}
+                  </span>
+                </div>
+                {cart.length === 0 ? (
+                  <p className="py-7 text-sm text-[#74766f]">
+                    Ainda não adicionaste produtos.
+                  </p>
+                ) : (
+                  <>
+                    <ul className="mt-4 max-h-72 space-y-4 overflow-y-auto">
+                      {cart.map((item) => (
+                        <li className="flex gap-3" key={item.id}>
+                          <div
+                            aria-hidden="true"
+                            className="size-14 shrink-0 rounded-sm bg-cover bg-center"
+                            style={{ backgroundImage: `url('${item.image}')` }}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold">{item.name}</p>
+                            <p className="mt-0.5 text-xs text-[#777970]">
+                              {formatKz(item.price * item.quantity)}
+                            </p>
+                            <div className="mt-2 flex items-center gap-2">
+                              <button
+                                aria-label={`Diminuir quantidade de ${item.name}`}
+                                className="grid size-7 place-items-center rounded-sm border border-[#dedfd9] text-sm hover:border-[#171916]"
+                                onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
+                                type="button"
+                              >
+                                −
+                              </button>
+                              <span className="min-w-4 text-center text-xs">{item.quantity}</span>
+                              <button
+                                aria-label={`Aumentar quantidade de ${item.name}`}
+                                className="grid size-7 place-items-center rounded-sm border border-[#dedfd9] text-sm hover:border-[#171916]"
+                                onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
+                                type="button"
+                              >
+                                +
+                              </button>
+                              <button
+                                className="ml-auto text-xs font-medium text-[#777970] hover:text-[#d94332]"
+                                onClick={() => updateCartQuantity(item.id, 0)}
+                                type="button"
+                              >
+                                Remover
+                              </button>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-4 border-t border-[#ecece7] pt-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-[#62645d]">Subtotal</span>
+                        <span className="font-bold">{formatKz(cartTotal)}</span>
+                      </div>
+                      <a
+                        className="mt-4 flex min-h-11 items-center justify-center rounded-md bg-[#d94332] px-4 text-sm font-bold text-white transition-colors hover:bg-[#bd3528]"
+                        href="/checkout"
+                      >
+                        Finalizar compra
+                      </a>
+                    </div>
+                  </>
+                )}
                 <a
-                  className="mt-4 block border-t border-[#ecece7] pt-3 text-sm font-semibold text-[#d94332]"
+                  className="mt-3 block text-center text-sm font-semibold text-[#d94332]"
                   href="#destaques"
                   onClick={() => setCartOpen(false)}
                 >
@@ -322,7 +431,7 @@ export default function Home() {
                     <button
                       aria-label={`Adicionar ${product.name} à sacola`}
                       className="rounded-md border border-[#dedfd9] px-2.5 py-1.5 text-xs font-semibold transition-colors hover:border-[#d94332] hover:text-[#d94332]"
-                      onClick={() => setCartCount((count) => count + 1)}
+                      onClick={() => addToCart(product)}
                       type="button"
                     >
                       Adicionar
@@ -419,7 +528,7 @@ export default function Home() {
           </div>
           <a
             className="inline-flex min-h-11 items-center justify-center self-start rounded-md bg-[#e8bf48] px-5 text-sm font-bold text-[#171916] transition-colors hover:bg-[#f4d36e] sm:self-auto"
-            href="mailto:parcerias@thego.ao"
+            href="/auth/signin?callbackUrl=%2Fseller%2Fdashboard"
           >
             Vender na THEGO
           </a>
