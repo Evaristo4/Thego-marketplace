@@ -5,6 +5,7 @@ import {
   calculateFreight,
   FREIGHT_BASE_PRICES_KZ,
   type AngolaProvince,
+  type FreightItemType,
 } from "@/lib/freight";
 
 const categories = ["Todos", "Tecnologia", "Moda", "Casa", "Beleza"] as const;
@@ -92,7 +93,9 @@ function formatKz(amount: number) {
 export default function Home() {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<Category>("Todos");
-  const [province, setProvince] = useState<AngolaProvince>("Luanda");
+  const [province, setProvince] = useState<AngolaProvince>("Huambo");
+  const [weightKg, setWeightKg] = useState("1");
+  const [itemType, setItemType] = useState<FreightItemType>("NORMAL");
   const [cartCount, setCartCount] = useState(0);
   const [cartOpen, setCartOpen] = useState(false);
 
@@ -346,10 +349,10 @@ export default function Home() {
               O teu próximo achado chega até ti.
             </h2>
             <p className="mt-3 max-w-lg text-sm leading-6 text-[#686a62] sm:text-base">
-              Escolhe a província e consulta o valor-base estimado da entrega.
+              O valor depende da província, do peso e do tipo de mercadoria. Encomendas leves pagam menos.
             </p>
           </div>
-          <div className="grid gap-4 rounded-md border border-[#dedccf] bg-white p-5 sm:grid-cols-[1fr_auto] sm:items-end sm:p-6">
+          <div className="grid gap-4 rounded-md border border-[#dedccf] bg-white p-5 sm:grid-cols-2 sm:items-end sm:p-6">
             <div>
               <label className="mb-2 block text-sm font-semibold" htmlFor="province">
                 Província de entrega
@@ -367,9 +370,40 @@ export default function Home() {
                 ))}
               </select>
             </div>
+            <div>
+              <label className="mb-2 block text-sm font-semibold" htmlFor="weight">
+                Peso aproximado (kg)
+              </label>
+              <input
+                className="h-12 w-full rounded-md border border-[#d8d9d2] bg-white px-3 text-sm outline-none focus:border-[#d94332]"
+                id="weight"
+                min="0.1"
+                onChange={(event) => setWeightKg(event.target.value)}
+                step="0.1"
+                type="number"
+                value={weightKg}
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-semibold" htmlFor="item-type">
+                Tipo de mercadoria
+              </label>
+              <select
+                className="h-12 w-full rounded-md border border-[#d8d9d2] bg-white px-3 text-sm outline-none focus:border-[#d94332]"
+                id="item-type"
+                onChange={(event) => setItemType(event.target.value as FreightItemType)}
+                value={itemType}
+              >
+                <option value="NORMAL">Normal</option>
+                <option value="FRAGIL">Frágil (+20%)</option>
+                <option value="VOLUMOSO">Volumosa (+50%)</option>
+              </select>
+            </div>
             <div aria-live="polite" className="min-w-36 border-l-2 border-[#e8bf48] pl-4">
               <p className="text-xs font-medium text-[#777970]">Frete estimado</p>
-              <p className="mt-1 text-xl font-bold">{formatKz(calculateFreight(province))}</p>
+              <p className="mt-1 text-xl font-bold">
+                {formatKz(calculateFreight(province, Number(weightKg), itemType))}
+              </p>
             </div>
           </div>
         </div>
